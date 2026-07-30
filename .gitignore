@@ -1,0 +1,5 @@
+vendor/
+templates_c/
+cache/
+configs/
+includes/db.inc.php
