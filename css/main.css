@@ -1,0 +1,7 @@
+body { background-color:#D9D9D9}
+.label { margin-right:2px; }
+dl.dl-horizontal dt { width:160px; }
+dl.dl-horizontal dd { margin-left:180px; }
+td.lowsec {background-color:orange !important}
+td.highsec {background-color:lightgreen !important}
+td.nullsec {background-color:crimson !important}
