@@ -2,6 +2,38 @@ body { background-color:#D9D9D9}
 .label { margin-right:2px; }
 dl.dl-horizontal dt { width:160px; }
 dl.dl-horizontal dd { margin-left:180px; }
-td.lowsec {background-color:orange !important}
-td.highsec {background-color:lightgreen !important}
-td.nullsec {background-color:crimson !important}
+
+/*
+ * The sitewide dark-mode.css (bootstrap/dark-mode.css) doesn't cover
+ * .nav-tabs, since no other app on the site currently uses Bootstrap tabs -
+ * this app's Requirements/Systems/Stations/Raw Parameters tabs are the first
+ * user of them, so the fix lives here rather than in the shared file.
+ * Bootstrap 3 hardcodes a white background on the active tab; match the
+ * palette already used by dark-mode.css elsewhere (panel/table bg #262626,
+ * borders #3a3a3a) so it blends in instead of a follow-up fix.
+ *
+ * !important is required here, not just belt-and-braces: layout.tpl loads
+ * this file *before* bootstrap.min.css (and dark-mode.css), so at equal
+ * selector specificity Bootstrap's same rule - loaded later - would win
+ * without it. This mirrors why dark-mode.css itself uses !important
+ * throughout.
+ */
+@media (prefers-color-scheme: dark) {
+    .nav-tabs {
+        border-bottom-color: #3a3a3a !important;
+    }
+    .nav-tabs > li > a {
+        color: #ddd !important;
+    }
+    .nav-tabs > li > a:hover {
+        background-color: #3a3a3a !important;
+        border-color: #3a3a3a #3a3a3a #3a3a3a !important;
+    }
+    .nav-tabs > li.active > a,
+    .nav-tabs > li.active > a:hover,
+    .nav-tabs > li.active > a:focus {
+        background-color: #262626 !important;
+        color: #eee !important;
+        border-color: #3a3a3a #3a3a3a transparent !important;
+    }
+}

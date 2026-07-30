@@ -211,7 +211,7 @@ $(document).ready(function() {
                             {foreach $objective->solarSystems as $system}
                                 <tr>
                                     <td>{$system->solarSystemName}</td>
-                                    <td class="{$system->securityClass}">{$system->securityRounded}</td>
+                                    <td>{$system->securityRounded}</td>
                                     <td>{$system->constellationName}</td>
                                     <td>{$system->regionName}</td>
                                 </tr>
@@ -232,7 +232,7 @@ $(document).ready(function() {
                                 <tr>
                                     <td>{$station->stationName}</td>
                                     <td>{$station->solarSystemName}</td>
-                                    <td class="{$station->securityClass}">{$station->securityRounded}</td>
+                                    <td>{$station->securityRounded}</td>
                                     <td>{$station->constellationName}</td>
                                     <td>{$station->regionName}</td>
                                 </tr>

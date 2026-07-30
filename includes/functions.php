@@ -43,16 +43,6 @@ function extractIdsByValueType($decodedParams, $valueType)
     return array_keys($ids);
 }
 
-function securityClass($security)
-{
-    if ($security >= 0.5) {
-        return 'highsec';
-    } elseif ($security > 0) {
-        return 'lowsec';
-    }
-    return 'nullsec';
-}
-
 function fetchSolarSystems($dbh, $ids)
 {
     if (!$ids) {
@@ -72,7 +62,6 @@ function fetchSolarSystems($dbh, $ids)
     $systems = array();
     while ($row = $stmt->fetchObject()) {
         $row->securityRounded = round($row->security, 1);
-        $row->securityClass = securityClass($row->securityRounded);
         $systems[] = $row;
     }
     return $systems;
@@ -98,7 +87,6 @@ function fetchStations($dbh, $ids)
     $stations = array();
     while ($row = $stmt->fetchObject()) {
         $row->securityRounded = round($row->security, 1);
-        $row->securityClass = securityClass($row->securityRounded);
         $stations[] = $row;
     }
     return $stations;
