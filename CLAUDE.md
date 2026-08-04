@@ -17,10 +17,16 @@ There are two pages:
 - `campaign.php?campaignID=<uuid>` → `templates/campaign.tpl`: one campaign's objectives in a
   table, each row expandable into a details row (status/progress, rewards, tags, resolved
   locations/requirements, raw JSON). The table has client-side filters for objective status,
-  career path, method, and tags.
+  career path, method, tags, and (client-side, see "Personal campaign activity" below) the
+  viewer's own activity.
 
 There's also a standalone CLI script, `scripts/syncObjectiveStatus.php`, that pulls live
 objective state from ESI on a periodic basis — see "Live objective status" below.
+
+Separately, the app has its own small EVE SSO login (`login.php`/`auth.php`/`logout.php`,
+scope `esi.activity.char:read`) letting a visitor see their own contribution to each
+campaign/objective — see "Personal campaign activity" below. This is unrelated to, and does
+not reuse, the sitewide identity-only `/auth/` login used elsewhere on fuzzwork.co.uk.
 
 ## Commands
 
@@ -144,6 +150,68 @@ null-safe display, e.g. an "Unknown" status badge, is intentional here, not a bu
 with an INNER JOIN). `progressPercent` is computed in PHP from `statusProgress` /
 `targetProgress`, guarded against a zero/null target.
 
+**Personal campaign activity**: `login.php` → EVE SSO (scope `esi.activity.char:read`) →
+`auth.php` (the registered callback — must stay at exactly this path/name) → paginated `GET
+/characters/{id}/military-campaigns/objectives` (same cursor-based `limit`/`after` pagination
+as the campaign-wide sync above; this endpoint defaults `limit` to 10, so `auth.php` uses 50)
+via `mc_fetch_activity()` in `includes/auth_functions.php`. **This is a deliberate one-off
+pull, not a persistent-token feature**: the access token (and any refresh token) is used
+exactly once, inline in `auth.php`, to make that one call, then discarded — it is never
+written to `$_SESSION` and there is no refresh-token logic anywhere in this app. Only the
+*result* persists, under `$_SESSION['mc_character_id']` / `mc_character_name` /
+`mc_activity_data` (an objectiveID-keyed map) / `mc_activity_fetched_at`. If a visitor wants
+newer data, they log in again — `login.php` doubles as the "refresh" action, overwriting the
+snapshot. `logout.php` only unsets these `mc_*` keys (never `session_unset()`/
+`session_destroy()`, which would also clear the unrelated sitewide `/auth/` login's
+`auth_*` keys if both happened to be set in the same session). `includes/secret.php`
+(gitignored; `.example` stub committed) holds this feature's own `$mc_client_id`/
+`$mc_client_secret` — a separate EVE Developer Application from the sitewide `/auth/` one,
+registered specifically for this scope.
+
+`api/activity.php` is the only way this data reaches the browser: `{"loggedIn":false}` if no
+`mc_activity_data` in session, else `{"loggedIn":true,"characterID":...,"characterName":...,
+"objectives":{...}}` (each objective entry has `campaignID`/`contributed`/`isCommitted`, plus
+`maxProgressPerParticipant`/`status` — added by `enrichActivityWithStatus()` in
+`includes/functions.php`, a single `IN (...)`-batched query joining
+`milCampaignObjectives`/`militarycampaigns.milCampaignObjectiveStatus` for exactly the
+objective ids present in the session's activity map. This is public data, the same as
+`campaign.php` already shows — no privacy concern — and only queried when `mc_activity_data`
+is non-empty, so a logged-out request never touches `$dbh`).
+
+`js/activity.js` (loaded by both `index.tpl` and `campaign.tpl`) fetches this client-side and
+fills in `#mc-auth-ui` plus a page-specific bit, using one shared `classifyActivity(info)`
+helper (hitting your personal cap means "completed" regardless of the objective's own state;
+short of the cap, the objective's state distinguishes still-in-progress from too-late) so the
+two pages can't drift out of sync on what "completed"/"failed"/"active" mean:
+- `campaign.tpl`: the empty `.mc-my-activity` cell in each objective row's "Your Activity"
+  column (a badge + progress bar + `contributed / maxProgressPerParticipant` text, mirroring
+  the server-rendered "Status" column's markup) plus a `data-my` attribute (pipe-delimited,
+  matching the existing `data-tags` convention) used by the "My Activity" filter group. This
+  page classifies using the row's *own* server-rendered `data-max-progress`/`data-status`
+  (already authoritative for this page) rather than the API's enriched copy of the same
+  fields — `classifyActivity()` is called with an object built from those attributes.
+  - No contribution for this objective → "No Activity" (`label-default`), no `data-my` flag.
+  - `contributed >= maxProgressPerParticipant` (any objective state) → "Completed"
+    (`label-success`), `data-my="active|completed"`.
+  - Below the cap, objective still `Active` → "Active" (`label-info`), `data-my="active"`.
+  - Below the cap, objective `Completed` → "Failed" (`label-danger`),
+    `data-my="active|failed"` — contributed, but not enough before the objective closed.
+    (ESI's own `is_committed` flag is still fetched and exposed via `api/activity.php` for
+    anyone else consuming that endpoint, but the UI no longer keys off it here.)
+- `index.tpl`: each campaign panel's `panel-body` is split into two `col-md-6` columns (the
+  existing Race/Focus/Theme Pack/etc. `<dl>` + "View Objectives" button on the left, a "Your
+  Activity" heading + the `.mc-campaign-activity` placeholder on the right). `js/activity.js`
+  tallies `classifyActivity()`'s result across every objective the character has `contributed
+  > 0` to, grouped by `campaignID` (this is the one place that *needs* the API's enriched
+  `maxProgressPerParticipant`/`status`, since index.php has no per-objective markup of its
+  own to read them from), and fills the placeholder with e.g. "2 completed, 1 failed, 3 still
+  active." — skipping any clause whose count is zero.
+
+After enriching `campaign.tpl`'s rows, `js/activity.js` calls the page's `applyFilters()` (see
+"Client-side objective filters" below) so an already-selected filter re-evaluates against the
+newly available `data-my` values. See the caching note below for *why* all of this is done
+client-side rather than in `index.php`/`campaign.php` PHP.
+
 **EVE `showinfo:` links**: `milCampaigns.subtitle` / `milCampaignObjectives.subtitle` sometimes
 contain in-game-only `<a href=showinfo:TYPEID//ITEMID>Name</a>` markup that doesn't work in a
 browser. `eveLinkStrip()` in `includes/functions.php` strips the tag but keeps the inner text,
@@ -162,6 +230,18 @@ params), specifically so they don't need their own slice of the cache_id — kee
 rather than reintroducing server-side filtering unless there's a reason the cache_id can't
 absorb it. After any change to a `.tpl` file or to the PHP that feeds it, clear `cache/` (and
 `templates_c/` if the template itself changed) or you'll see stale output.
+
+**Corollary — why personal activity data never touches `$smarty->assign()`**: `index.php`
+caches with *no* `cache_id` at all (a single shared entry for every visitor, worse than
+`campaign.php`'s per-campaign one). Any per-viewer value (contributed amounts, character
+name) that reached a template variable would risk getting frozen into that shared cache and
+served to a completely different, possibly-logged-out visitor — a privacy leak, not just a
+staleness bug. This is why the "Personal campaign activity" feature above is deliberately
+implemented as static, identical-for-everyone template markup (`#mc-auth-ui`,
+`.mc-campaign-activity`, `data-objective-id`) filled in entirely client-side by
+`js/activity.js` after the cached page has already loaded. Don't "simplify" this by moving
+the lookup back into `index.php`/`campaign.php` PHP without also solving the cache_id problem
+first.
 
 **Detail-row tabs**: `campaign.tpl`'s per-objective details row uses Bootstrap's
 `data-toggle="tab"` tabs (JS comes for free via the shared `footer.php` include, no extra

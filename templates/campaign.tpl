@@ -3,48 +3,55 @@
 {block name=extrajavascript}
 {literal}
 <script type="text/javascript">
+function applyFilters() {
+    var status = $('.status-filter-btn.active').data('status');
+    var career = $('.career-filter-btn.active').data('career');
+    var method = $('.method-filter-btn.active').data('method');
+    var my = $('.my-filter-btn.active').data('my');
+    var activeTags = $('.tag-filter-btn.active').map(function() {
+        return String($(this).data('tag'));
+    }).get();
+
+    $('#objectivesTable tbody tr.objective-row').each(function() {
+        var $row = $(this);
+        var show = true;
+
+        if (status && $row.data('status') !== status) {
+            show = false;
+        }
+        if (career && $row.data('career') !== career) {
+            show = false;
+        }
+        if (method && String($row.data('method')) !== method) {
+            show = false;
+        }
+        if (show && my) {
+            var rowMy = String($row.data('my') || '').split('|');
+            if (rowMy.indexOf(String(my)) === -1) {
+                show = false;
+            }
+        }
+        if (show && activeTags.length && activeTags[0] !== '') {
+            var rowTags = String($row.data('tags') || '').split('|');
+            var matches = activeTags.some(function(t) {
+                return rowTags.indexOf(t) !== -1;
+            });
+            if (!matches) {
+                show = false;
+            }
+        }
+
+        $row.toggle(show);
+        $row.next('.objective-details-row').hide();
+    });
+}
+
 $(document).ready(function() {
     $('.objective-details-toggle').click(function() {
         $(this).closest('tr').next('.objective-details-row').toggle();
     });
 
-    function applyFilters() {
-        var status = $('.status-filter-btn.active').data('status');
-        var career = $('.career-filter-btn.active').data('career');
-        var method = $('.method-filter-btn.active').data('method');
-        var activeTags = $('.tag-filter-btn.active').map(function() {
-            return String($(this).data('tag'));
-        }).get();
-
-        $('#objectivesTable tbody tr.objective-row').each(function() {
-            var $row = $(this);
-            var show = true;
-
-            if (status && $row.data('status') !== status) {
-                show = false;
-            }
-            if (career && $row.data('career') !== career) {
-                show = false;
-            }
-            if (method && String($row.data('method')) !== method) {
-                show = false;
-            }
-            if (show && activeTags.length && activeTags[0] !== '') {
-                var rowTags = String($row.data('tags') || '').split('|');
-                var matches = activeTags.some(function(t) {
-                    return rowTags.indexOf(t) !== -1;
-                });
-                if (!matches) {
-                    show = false;
-                }
-            }
-
-            $row.toggle(show);
-            $row.next('.objective-details-row').hide();
-        });
-    }
-
-    $('.status-filter-btn, .career-filter-btn, .method-filter-btn').click(function() {
+    $('.status-filter-btn, .career-filter-btn, .method-filter-btn, .my-filter-btn').click(function() {
         $(this).siblings().removeClass('active');
         $(this).addClass('active');
         applyFilters();
@@ -66,6 +73,7 @@ $(document).ready(function() {
 });
 </script>
 {/literal}
+<script src="{$baseurl}/js/activity.js"></script>
 {/block}
 {block name=body}
 <div class="page-header">
@@ -79,7 +87,7 @@ $(document).ready(function() {
     <dt>Campaign Set</dt><dd>{$campaign->campaignSet}</dd>
     <dt>Target Progress</dt><dd>{$campaign->targetProgress|number_format}</dd>
 </dl>
-<p><a href="{$baseurl}/">&laquo; Back to all campaigns</a></p>
+<p><a href="{$baseurl}/">&laquo; Back to all campaigns</a> &mdash; <span id="mc-auth-ui"></span></p>
 
 <h2>Objectives</h2>
 <div style="margin-bottom:6px;">
@@ -109,7 +117,7 @@ $(document).ready(function() {
 </div>
 {/if}
 {if $tagFilters}
-<div style="margin-bottom:10px;">
+<div style="margin-bottom:6px;">
     <strong>Tags:</strong>
     <button type="button" class="btn btn-default btn-sm tag-filter-btn active" data-tag="" style="margin:2px;">All</button>
     {foreach $tagFilters as $t}
@@ -117,6 +125,14 @@ $(document).ready(function() {
     {/foreach}
 </div>
 {/if}
+<div style="margin-bottom:10px;">
+    <strong>My Activity:</strong>
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-default btn-sm my-filter-btn active" data-my="">All</button>
+        <button type="button" class="btn btn-default btn-sm my-filter-btn" data-my="active">My Activity</button>
+        <button type="button" class="btn btn-default btn-sm my-filter-btn" data-my="completed">My Completions</button>
+    </div>
+</div>
 <table id="objectivesTable" class="table table-striped table-bordered">
     <thead>
         <tr>
@@ -124,6 +140,7 @@ $(document).ready(function() {
             <th>Career Path</th>
             <th>Method</th>
             <th>Status</th>
+            <th>Your Activity</th>
             <th>Target Progress</th>
             <th>Max / Participant</th>
             <th>ISK Reward</th>
@@ -135,7 +152,7 @@ $(document).ready(function() {
     </thead>
     <tbody>
     {foreach $objectives as $objective}
-        <tr class="objective-row" data-status="{$objective->statusState}" data-career="{$objective->careerPath}" data-method="{$objective->contributionMethod}" data-tags="{$objective->tagsAttr}">
+        <tr class="objective-row" data-objective-id="{$objective->objectiveID}" data-status="{$objective->statusState}" data-career="{$objective->careerPath}" data-method="{$objective->contributionMethod}" data-tags="{$objective->tagsAttr}" data-max-progress="{$objective->maxProgressPerParticipant}">
             <td>{$objective->title}</td>
             <td>{$objective->careerPath}</td>
             <td>{$objective->methodDisplay}</td>
@@ -152,6 +169,7 @@ $(document).ready(function() {
                 <span class="label label-default">Unknown</span>
                 {/if}
             </td>
+            <td class="text-center mc-my-activity"></td>
             <td>{$objective->targetProgress|number_format}</td>
             <td>{$objective->maxProgressPerParticipant|number_format}</td>
             <td>{if $objective->rewardIskAmount}{$objective->rewardIskAmount|number_format} ISK / {$objective->rewardIskInterval|number_format} progress{/if}</td>
@@ -161,7 +179,7 @@ $(document).ready(function() {
             <td><button type="button" class="btn btn-xs btn-default objective-details-toggle">Details</button></td>
         </tr>
         <tr class="objective-details-row" style="display:none">
-            <td colspan="11">
+            <td colspan="12">
                 {if $objective->subtitle}<p>{$objective->subtitle}</p>{/if}
                 {if $objective->statusState}
                 <p><strong>Participants:</strong> {$objective->statusParticipantsTotal|number_format} total, {$objective->statusParticipantsCommitted|number_format} committed, {$objective->statusParticipantsContributors|number_format} contributed</p>

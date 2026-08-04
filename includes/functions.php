@@ -270,3 +270,33 @@ function extractContributionDetails($decodedParams, $dbh)
 
     return $details;
 }
+
+// Adds maxProgressPerParticipant + overall objective state to each entry of
+// a personal-activity map (as built by mc_fetch_activity()), so api/activity.php
+// can classify an objective as completed/failed/active the same way
+// campaign.tpl's "Your Activity" column does, even on pages (like index.php)
+// that don't already have this per-objective data rendered server-side. This
+// is public data (same as shown on campaign.php) - no privacy concern.
+function enrichActivityWithStatus($dbh, $activity)
+{
+    $ids = array_keys($activity);
+    if (!$ids) {
+        return $activity;
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $sql = "SELECT o.objectiveID, o.maxProgressPerParticipant, st.state
+            FROM milCampaignObjectives o
+            LEFT JOIN militarycampaigns.milCampaignObjectiveStatus st ON st.objectiveID = o.objectiveID
+            WHERE o.objectiveID IN ($placeholders)";
+    $stmt = $dbh->prepare($sql);
+    $stmt->execute($ids);
+
+    while ($row = $stmt->fetchObject()) {
+        if (isset($activity[$row->objectiveID])) {
+            $activity[$row->objectiveID]['maxProgressPerParticipant'] = (int)$row->maxProgressPerParticipant;
+            $activity[$row->objectiveID]['status'] = $row->state;
+        }
+    }
+
+    return $activity;
+}
