@@ -13,7 +13,7 @@ MySQL database (SDE + Faction Warfare tables).
   tables
 - A second MySQL database, `militarycampaigns`, holding just one table -
   `milCampaignObjectiveStatus` - for live objective status synced from ESI (see
-  `scripts/syncObjectiveStatus.php`)
+  [militarycampaigns-sync](https://github.com/fuzzysteve/militarycampaigns-sync)
 
 ## Setup
 
@@ -45,18 +45,11 @@ cp includes/secret.php.example includes/secret.php
 
 ## Live objective status
 
-`scripts/syncObjectiveStatus.php` is a standalone CLI script that pages through ESI's
-`GET /military-campaigns/{campaignID}/objectives` for every known campaign and upserts each
-objective's state/progress into `militarycampaigns.milCampaignObjectiveStatus`. Run it on a
-schedule (e.g. cron) to keep the displayed status current:
-
-```bash
-php scripts/syncObjectiveStatus.php
-```
-
-ESI currently requires an authenticated bearer token for this endpoint (CCP has indicated
-this requirement will eventually be dropped); the token is a short-lived EVE SSO character
-token that needs manually replacing in the script when it expires.
+`militarycampaigns.milCampaignObjectiveStatus` (the live status/progress shown on
+`campaign.php`) is populated by a separate project,
+[militarycampaigns-sync](https://github.com/fuzzysteve/militarycampaigns-sync), which pages
+through ESI's `GET /military-campaigns/{campaignID}/objectives` for every known campaign and
+upserts the results. Run it on a schedule (e.g. cron) to keep the displayed status current.
 
 ## Personal campaign activity
 
