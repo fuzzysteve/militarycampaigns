@@ -6,6 +6,19 @@
 // written to $_SESSION and there is no refresh-token handling. Only the
 // *result* of that one ESI call persists in session (see mc_get_my_activity()).
 
+// ESI always returns campaign/objective ids in standard dashed UUID form,
+// but the DB (both eve.milCampaigns/milCampaignObjectives and
+// militarycampaigns.milCampaignObjectiveStatus) now stores them via
+// SQLAlchemy's Uuid type, which on MySQL is CHAR(32) - the 32 hex digits
+// with no dashes. Strip dashes on the way in so activity data keys/values
+// match what campaign.tpl/index.tpl render into data-objective-id/
+// data-campaign-id (straight from the DB) and what enrichActivityWithStatus()
+// joins against.
+function mc_normalize_uuid($uuid)
+{
+    return str_replace('-', '', $uuid);
+}
+
 function mc_decode_jwt_character($accessToken)
 {
     $payload = explode('.', $accessToken)[1];
@@ -72,7 +85,7 @@ function mc_fetch_activity($accessToken, $characterId)
             CURLOPT_HTTPHEADER => array(
                 'Accept: application/json',
                 'Authorization: Bearer '.$accessToken,
-                'X-Compatibility-Date: 2099-01-01',
+                'X-Compatibility-Date: 2026-08-04',
             ),
             CURLOPT_TIMEOUT => 30,
         ));
@@ -89,8 +102,8 @@ function mc_fetch_activity($accessToken, $characterId)
         $data = json_decode($body);
         $objectives = isset($data->objectives) ? $data->objectives : array();
         foreach ($objectives as $objective) {
-            $activity[$objective->id] = array(
-                'campaignID' => $objective->campaign_id,
+            $activity[mc_normalize_uuid($objective->id)] = array(
+                'campaignID' => mc_normalize_uuid($objective->campaign_id),
                 'contributed' => $objective->contributed,
                 'isCommitted' => $objective->is_committed,
             );
