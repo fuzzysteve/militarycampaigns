@@ -19,21 +19,48 @@ dl.dl-horizontal dd { margin-left:180px; }
  * throughout.
  */
 @media (prefers-color-scheme: dark) {
-    .nav-tabs {
+
+    :root:not([data-theme="light"]) .nav-tabs {
         border-bottom-color: #3a3a3a !important;
     }
-    .nav-tabs > li > a {
+
+    :root:not([data-theme="light"]) .nav-tabs > li > a {
         color: #ddd !important;
     }
-    .nav-tabs > li > a:hover {
+
+    :root:not([data-theme="light"]) .nav-tabs > li > a:hover {
         background-color: #3a3a3a !important;
         border-color: #3a3a3a #3a3a3a #3a3a3a !important;
     }
-    .nav-tabs > li.active > a,
-    .nav-tabs > li.active > a:hover,
-    .nav-tabs > li.active > a:focus {
+
+    :root:not([data-theme="light"]) .nav-tabs > li.active > a,
+    :root:not([data-theme="light"]) .nav-tabs > li.active > a:hover,
+    :root:not([data-theme="light"]) .nav-tabs > li.active > a:focus {
         background-color: #262626 !important;
         color: #eee !important;
         border-color: #3a3a3a #3a3a3a transparent !important;
     }
+
+}
+
+/* Explicit override: data-theme="dark" set by the toggle, independent of system preference */
+:root[data-theme="dark"] .nav-tabs {
+    border-bottom-color: #3a3a3a !important;
+}
+
+:root[data-theme="dark"] .nav-tabs > li > a {
+    color: #ddd !important;
+}
+
+:root[data-theme="dark"] .nav-tabs > li > a:hover {
+    background-color: #3a3a3a !important;
+    border-color: #3a3a3a #3a3a3a #3a3a3a !important;
+}
+
+:root[data-theme="dark"] .nav-tabs > li.active > a,
+:root[data-theme="dark"] .nav-tabs > li.active > a:hover,
+:root[data-theme="dark"] .nav-tabs > li.active > a:focus {
+    background-color: #262626 !important;
+    color: #eee !important;
+    border-color: #3a3a3a #3a3a3a transparent !important;
 }
