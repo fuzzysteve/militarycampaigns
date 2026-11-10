@@ -229,9 +229,12 @@ link tags (keeping their text), escapes everything, re-allows only `<b>`/`<i>`/`
 **Campaign state is derived, not stored**: neither the SDE (checked raw JSONL too) nor ESI has
 any campaign-level state, start or end date. `fetchCampaignStates()` derives it from the synced
 objective rows: a campaign has *ended* when it has no `Active` objective, or none of its rows'
-`lastModified` changed in `CAMPAIGN_STALE_DAYS` (3). The second rule is needed because the sync
-is a cursor-based change feed and ESI stops returning a closed campaign, which can leave
-objectives stuck at `Active` forever (season 1 left three). Started = MIN(`started`), ended =
+`lastModified` changed in `CAMPAIGN_STALE_DAYS` (3). The second rule is needed because the
+cursor-based sync can miss an objective's final Completed update, leaving it stuck at `Active`
+forever (season 1 left three; a full re-pull from `after=0` on 2026-11-10 showed all three as
+Completed in ESI, with the same `last_modified` second as our stale row). ESI does still serve
+ended campaigns' objectives - note campaign IDs must be sent in dashed UUID form, the dashless
+DB form 404s. Started = MIN(`started`), ended =
 MAX(`finished`). Stale `Active` rows on an ended campaign count as Completed: at close ESI
 expires every still-open objective in one batch (season 1: all 53 `Expired` rows finished
 2026-09-29 11:00), so a row that never got that expiry had already closed by completing, and the
