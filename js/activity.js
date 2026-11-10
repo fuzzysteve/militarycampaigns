@@ -14,7 +14,8 @@ $(document).ready(function() {
         if (metMax) {
             return 'completed';
         }
-        if (info.status === 'Completed') {
+        // Completed or Expired (any closed state) without hitting the cap.
+        if (info.status && info.status !== 'Active') {
             return 'failed';
         }
         return 'active';

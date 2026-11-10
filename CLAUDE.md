@@ -90,6 +90,13 @@ access to `eve.*`):
 static-data-export + FW tables):
 - `milCampaigns`, `milCampaignObjectives`, `milCampaignObjContentTags` — the actual campaign
   data (primary keys are UUID strings, not ints).
+- `milCampaignAnnotations` / `milCampaignObjAnnotations` — key/value text per campaign /
+  objective (`annotationKey`, `value`). Campaign keys shown: `briefing*` (goal, success/failure
+  outcome, final words), `presentingCharacter*`, `mapHeader`/`mapSubheader`/`mapSectionN*`
+  ("Theaters of Operation" tab), `finished*` (outcome label + description once ended). The
+  `res:/` image/video keys are client-only paths and aren't usable in a browser. Objective keys
+  shown: `warningN` in the details row; `restrictionTooltip` and
+  `requiredEnlistmentWithFactionID` duplicate `warning1` / `requiredEnlistmentFactionID`.
 - `chrFactions`, `crpNPCCorporations` — name lookups for faction/corporation IDs referenced by
   campaigns and objectives (issuer, rewards, enlistment, and the various combat-role factions
   inside `contributionParameters`).
@@ -194,7 +201,7 @@ two pages can't drift out of sync on what "completed"/"failed"/"active" mean:
   - `contributed >= maxProgressPerParticipant` (any objective state) → "Completed"
     (`label-success`), `data-my="active|completed"`.
   - Below the cap, objective still `Active` → "Active" (`label-info`), `data-my="active"`.
-  - Below the cap, objective `Completed` → "Failed" (`label-danger`),
+  - Below the cap, objective closed (`Completed` or `Expired`) → "Failed" (`label-danger`),
     `data-my="active|failed"` — contributed, but not enough before the objective closed.
     (ESI's own `is_committed` flag is still fetched and exposed via `api/activity.php` for
     anyone else consuming that endpoint, but the UI no longer keys off it here.)
@@ -212,11 +219,31 @@ After enriching `campaign.tpl`'s rows, `js/activity.js` calls the page's `applyF
 newly available `data-my` values. See the caching note below for *why* all of this is done
 client-side rather than in `index.php`/`campaign.php` PHP.
 
-**EVE `showinfo:` links**: `milCampaigns.subtitle` / `milCampaignObjectives.subtitle` sometimes
-contain in-game-only `<a href=showinfo:TYPEID//ITEMID>Name</a>` markup that doesn't work in a
-browser. `eveLinkStrip()` in `includes/functions.php` strips the tag but keeps the inner text,
-then escapes the rest of the string. Always run any new text field from these tables through it
-before echoing.
+**EVE in-game markup**: subtitles and annotation values contain in-game-only markup —
+`<a href=showinfo:…>`, `<a href="localsvc:…">`, `<url=showinfo:…>`/`<url=show_on_map:…>`, plus
+`<b>`, `<i>`, `<br>` and real newlines. `eveRichText()` in `includes/functions.php` drops the
+link tags (keeping their text), escapes everything, re-allows only `<b>`/`<i>`/`<br>`, and
+`nl2br`s. Always run any new text field from these tables through it before echoing.
+(`eveLinkStrip()` is the older, `<a>`-only version and is no longer used by the pages.)
+
+**Campaign state is derived, not stored**: neither the SDE (checked raw JSONL too) nor ESI has
+any campaign-level state, start or end date. `fetchCampaignStates()` derives it from the synced
+objective rows: a campaign has *ended* when it has no `Active` objective, or none of its rows'
+`lastModified` changed in `CAMPAIGN_STALE_DAYS` (3). The second rule is needed because the sync
+is a cursor-based change feed and ESI stops returning a closed campaign, which can leave
+objectives stuck at `Active` forever (season 1 left three). Started = MIN(`started`), ended =
+MAX(`finished`). Stale `Active` rows on an ended campaign count as Completed: at close ESI
+expires every still-open objective in one batch (season 1: all 53 `Expired` rows finished
+2026-09-29 11:00), so a row that never got that expiry had already closed by completing, and the
+sync missed its final update (Rogue Edge's courier objective was stuck at 94% since June; without
+it the campaign would wrongly read 29/30 UNSUCCESSFUL). That's only trusted if the campaign has
+`Expired` rows (`closeoutSeen`); otherwise a stale row counts only if progress >= its target.
+Ended + Completed >= `milCampaigns.targetProgress` means VICTORY, otherwise UNSUCCESSFUL
+(labels/text from the `finished*` annotations). `effectiveObjectiveState()` applies the same rule
+per objective, both in `campaign.php` and in `enrichActivityWithStatus()`. On the index page, ended
+campaigns are grouped by `campaignSet` into "Season N" sections that start collapsed (Bootstrap
+`data-toggle="collapse"`, client-side so the shared index cache entry needs no cache_id); the
+panel markup lives once in a Smarty `{function name=campaignPanel}` used by both lists.
 
 **Smarty caching gotcha**: caching is on (`Smarty::CACHING_LIFETIME_SAVED`, default 1 hour
 lifetime, inherited from Smarty's default — never explicitly set here). Smarty's cache key

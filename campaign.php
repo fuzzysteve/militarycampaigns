@@ -18,7 +18,27 @@ if (!$campaign) {
     header('Location: '.$baseurl.'/');
     exit;
 }
-$campaign->subtitle = eveLinkStrip($campaign->subtitle);
+$campaign->subtitle = eveRichText($campaign->subtitle);
+$campaignStates = fetchCampaignStates($dbh);
+applyCampaignState($campaign, $campaignStates);
+$campaignState = isset($campaignStates[$campaignID]) ? $campaignStates[$campaignID] : null;
+
+// Briefing / map / outcome text, already passed through eveRichText().
+$campaignAnnotations = fetchCampaignAnnotations($dbh, array($campaignID));
+$annotations = array();
+if (isset($campaignAnnotations[$campaignID])) {
+    foreach ($campaignAnnotations[$campaignID] as $key => $value) {
+        $annotations[$key] = eveRichText($value);
+    }
+}
+$mapSections = array();
+for ($i = 1; isset($annotations['mapSection'.$i.'Title']) || isset($annotations['mapSection'.$i.'Paragraph']); $i++) {
+    $mapSections[] = array(
+        'title' => isset($annotations['mapSection'.$i.'Title']) ? $annotations['mapSection'.$i.'Title'] : '',
+        'paragraph' => isset($annotations['mapSection'.$i.'Paragraph']) ? $annotations['mapSection'.$i.'Paragraph'] : '',
+    );
+}
+$objectiveAnnotations = fetchObjectiveAnnotations($dbh, $campaignID);
 
 $objsql = "SELECT o.*,
                   ic.corporationName AS issuerCorpName,
@@ -47,7 +67,7 @@ $tagstmt = $dbh->prepare($tagsql);
 
 $objectives = array();
 while ($row = $objstmt->fetchObject()) {
-    $row->subtitle = eveLinkStrip($row->subtitle);
+    $row->subtitle = eveRichText($row->subtitle);
 
     $tagstmt->execute(array($row->objectiveID));
     $tags = array();
@@ -57,6 +77,20 @@ while ($row = $objstmt->fetchObject()) {
     $row->tags = $tags;
     $row->tagsAttr = implode('|', $tags);
     $row->methodDisplay = camelCaseToWords($row->contributionMethod);
+
+    $row->statusRawState = $row->statusState;
+    $row->statusState = effectiveObjectiveState($row->statusState, $row->statusProgress, $row->targetProgress, $campaignState);
+
+    // warning1, warning2, ... in key order. (restrictionTooltip is a
+    // plain-text duplicate of warning1, and requiredEnlistmentWithFactionID
+    // duplicates requiredEnlistmentFactionID, so neither is shown.)
+    $row->warnings = array();
+    if (isset($objectiveAnnotations[$row->objectiveID])) {
+        $oa = $objectiveAnnotations[$row->objectiveID];
+        for ($i = 1; isset($oa['warning'.$i]); $i++) {
+            $row->warnings[] = eveRichText($oa['warning'.$i]);
+        }
+    }
 
     $row->progressPercent = null;
     if ($row->statusProgress !== null && $row->targetProgress > 0) {
@@ -120,6 +154,8 @@ usort($tagFilters, function ($a, $b) {
 });
 
 $smarty->assign('campaign', $campaign);
+$smarty->assign('annotations', $annotations);
+$smarty->assign('mapSections', $mapSections);
 $smarty->assign('objectives', $objectives);
 $smarty->assign('careerPathFilters', $careerPathFilters);
 $smarty->assign('methodFilters', $methodFilters);

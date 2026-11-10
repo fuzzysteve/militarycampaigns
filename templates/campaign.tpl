@@ -86,8 +86,83 @@ $(document).ready(function() {
     <dt>Theme Pack</dt><dd>{$campaign->themePack}</dd>
     <dt>Campaign Set</dt><dd>{$campaign->campaignSet}</dd>
     <dt>Target Progress</dt><dd>{$campaign->targetProgress|number_format}</dd>
+    {if $campaign->hasStatus}
+    <dt>Campaign Progress</dt><dd>
+        {$campaign->completedCount} / {$campaign->targetProgress|number_format} objectives completed
+        {if $campaign->campaignProgressPercent !== null}
+        <div class="progress" style="margin:4px 0 0 0;height:16px;max-width:400px;">
+            <div class="progress-bar {if $campaign->ended}{if $campaign->victory}progress-bar-success{else}progress-bar-danger{/if}{else}progress-bar-info{/if}" style="width:{$campaign->campaignProgressPercent}%">{$campaign->campaignProgressPercent}%</div>
+        </div>
+        {/if}
+    </dd>
+    <dt>Started</dt><dd>{$campaign->startedAt}</dd>
+    {if $campaign->ended}<dt>Ended</dt><dd>{$campaign->endedAt}</dd>{/if}
+    {/if}
 </dl>
 <p><a href="{$baseurl}/">&laquo; Back to all campaigns</a> &mdash; <span id="mc-auth-ui"></span></p>
+
+{if $campaign->ended}
+<div class="panel panel-{if $campaign->victory}success{else}danger{/if}">
+    <div class="panel-heading">
+        <h3 class="panel-title">{$annotations.finishedCampaignEnded|default:'Campaign Ended'}:
+            <strong>{if $campaign->victory}{$annotations.finishedResolutionStateSuccess|default:'Victory'}{else}{$annotations.finishedResolutionStateFailure|default:'Unsuccessful'}{/if}</strong>
+            <small>{$campaign->completedCount} of {$campaign->targetProgress|number_format} objectives needed were completed</small>
+        </h3>
+    </div>
+    {if $campaign->victory && $annotations.finishedSuccessDescription|default:''}
+    <div class="panel-body">{$annotations.finishedSuccessDescription}</div>
+    {elseif !$campaign->victory && $annotations.finishedFailureDescription|default:''}
+    <div class="panel-body">{$annotations.finishedFailureDescription}</div>
+    {/if}
+</div>
+{/if}
+
+{if $annotations.briefingGoalDescription|default:'' || $mapSections}
+<ul class="nav nav-tabs" role="tablist">
+    {if $annotations.briefingGoalDescription|default:''}
+    <li role="presentation" class="active"><a href="#campaign-briefing" role="tab" data-toggle="tab">{$annotations.briefingHeader|default:'Briefing'}</a></li>
+    {/if}
+    {if $mapSections}
+    <li role="presentation" class="{if !$annotations.briefingGoalDescription|default:''}active{/if}"><a href="#campaign-map" role="tab" data-toggle="tab">{$annotations.mapTitle|default:'Theaters of Operation'}</a></li>
+    {/if}
+</ul>
+<div class="tab-content" style="margin-bottom:20px;">
+    {if $annotations.briefingGoalDescription|default:''}
+    <div role="tabpanel" class="tab-pane active" id="campaign-briefing" style="padding-top:10px;">
+        {if $annotations.presentingCharacterName|default:''}
+        <p><strong>{$annotations.presentingCharacterName}</strong>{if $annotations.presentingCharacterSubtitle|default:''}<br><small>{$annotations.presentingCharacterSubtitle}</small>{/if}</p>
+        {/if}
+        <p>{$annotations.briefingGoalDescription}</p>
+        {if $annotations.briefingFinalWords|default:''}<p><em>{$annotations.briefingFinalWords}</em></p>{/if}
+        <div class="row">
+            {if $annotations.briefingSuccessDescription|default:''}
+            <div class="col-md-6">
+                <h4>{$annotations.briefingSuccessHeader|default:'Success'}</h4>
+                <p>{$annotations.briefingSuccessDescription}</p>
+            </div>
+            {/if}
+            {if $annotations.briefingFailureDescription|default:''}
+            <div class="col-md-6">
+                <h4>{$annotations.briefingFailureHeader|default:'Failure'}</h4>
+                <p>{$annotations.briefingFailureDescription}</p>
+            </div>
+            {/if}
+        </div>
+    </div>
+    {/if}
+    {if $mapSections}
+    <div role="tabpanel" class="tab-pane {if !$annotations.briefingGoalDescription|default:''}active{/if}" id="campaign-map" style="padding-top:10px;">
+        {if $annotations.mapHeader|default:''}<h4>{$annotations.mapHeader}{if $annotations.mapSubheader|default:''} <small>{$annotations.mapSubheader}</small>{/if}</h4>{/if}
+        <dl>
+        {foreach $mapSections as $section}
+            <dt>{$section.title}</dt>
+            <dd style="margin-bottom:10px;">{$section.paragraph}</dd>
+        {/foreach}
+        </dl>
+    </div>
+    {/if}
+</div>
+{/if}
 
 <h2>Objectives</h2>
 <div style="margin-bottom:6px;">
@@ -96,6 +171,7 @@ $(document).ready(function() {
         <button type="button" class="btn btn-default btn-sm status-filter-btn active" data-status="">All</button>
         <button type="button" class="btn btn-default btn-sm status-filter-btn" data-status="Active">Active</button>
         <button type="button" class="btn btn-default btn-sm status-filter-btn" data-status="Completed">Completed</button>
+        <button type="button" class="btn btn-default btn-sm status-filter-btn" data-status="Expired">Expired</button>
     </div>
 </div>
 {if $careerPathFilters}
@@ -158,10 +234,10 @@ $(document).ready(function() {
             <td>{$objective->methodDisplay}</td>
             <td class="text-center">
                 {if $objective->statusState}
-                <span class="label label-{if $objective->statusState=='Completed'}success{else}info{/if}">{$objective->statusState}</span>
+                <span class="label label-{if $objective->statusState=='Completed'}success{elseif $objective->statusState=='Expired'}warning{else}info{/if}"{if $objective->statusRawState != $objective->statusState} title="ESI last reported this objective as {$objective->statusRawState} ({$objective->statusProgress|number_format} / {$objective->targetProgress|number_format}){if $campaign->closeoutSeen}; it was not expired when the campaign closed, so it completed and the sync missed the final update{/if}"{/if}>{$objective->statusState}</span>
                 {if $objective->progressPercent !== null}
                 <div class="progress" style="margin:12px 0 0 0;height:16px;">
-                    <div class="progress-bar {if $objective->statusState=='Completed'}progress-bar-success{else}progress-bar-info{/if}" style="width:{$objective->progressPercent}%">{$objective->progressPercent}%</div>
+                    <div class="progress-bar {if $objective->statusState=='Completed'}progress-bar-success{elseif $objective->statusState=='Expired'}progress-bar-warning{else}progress-bar-info{/if}" style="width:{$objective->progressPercent}%">{$objective->progressPercent}%</div>
                 </div>
                 <small>{$objective->statusProgress|number_format} / {$objective->targetProgress|number_format}</small>
                 {/if}
@@ -186,6 +262,7 @@ $(document).ready(function() {
                 <p><strong>Started:</strong> {$objective->statusStarted} {if $objective->statusFinished}<strong>&nbsp;Finished:</strong> {$objective->statusFinished}{/if}</p>
                 {/if}
                 {if $objective->enlistmentFactionName}<p><strong>Requires Enlistment In:</strong> {$objective->enlistmentFactionName}</p>{/if}
+                {foreach $objective->warnings as $warning}<p class="text-warning"><span class="glyphicon glyphicon-warning-sign"></span> {$warning}</p>{/foreach}
                 {if $objective->tags}<p><strong>Tags:</strong> {foreach $objective->tags as $tag}<span class="label label-default">{$tag}</span> {/foreach}</p>{/if}
                 {if $objective->contributionParametersPretty}
                 <p><strong>Contribution Parameters:</strong></p>
