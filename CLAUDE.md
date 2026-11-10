@@ -226,27 +226,25 @@ link tags (keeping their text), escapes everything, re-allows only `<b>`/`<i>`/`
 `nl2br`s. Always run any new text field from these tables through it before echoing.
 (`eveLinkStrip()` is the older, `<a>`-only version and is no longer used by the pages.)
 
-**Campaign state is derived, not stored**: neither the SDE (checked raw JSONL too) nor ESI has
-any campaign-level state, start or end date. `fetchCampaignStates()` derives it from the synced
-objective rows: a campaign has *ended* when it has no `Active` objective, or none of its rows'
-`lastModified` changed in `CAMPAIGN_STALE_DAYS` (3). The second rule is needed because the
-cursor-based sync can miss an objective's final Completed update, leaving it stuck at `Active`
-forever (season 1 left three; a full re-pull from `after=0` on 2026-11-10 showed all three as
-Completed in ESI, with the same `last_modified` second as our stale row). ESI does still serve
-ended campaigns' objectives - note campaign IDs must be sent in dashed UUID form, the dashless
-DB form 404s. Started = MIN(`started`), ended =
-MAX(`finished`). Stale `Active` rows on an ended campaign count as Completed: at close ESI
-expires every still-open objective in one batch (season 1: all 53 `Expired` rows finished
-2026-09-29 11:00), so a row that never got that expiry had already closed by completing, and the
-sync missed its final update (Rogue Edge's courier objective was stuck at 94% since June; without
-it the campaign would wrongly read 29/30 UNSUCCESSFUL). That's only trusted if the campaign has
-`Expired` rows (`closeoutSeen`); otherwise a stale row counts only if progress >= its target.
-Ended + Completed >= `milCampaigns.targetProgress` means VICTORY, otherwise UNSUCCESSFUL
-(labels/text from the `finished*` annotations). `effectiveObjectiveState()` applies the same rule
-per objective, both in `campaign.php` and in `enrichActivityWithStatus()`. On the index page, ended
-campaigns are grouped by `campaignSet` into "Season N" sections that start collapsed (Bootstrap
-`data-toggle="collapse"`, client-side so the shared index cache entry needs no cache_id); the
-panel markup lives once in a Smarty `{function name=campaignPanel}` used by both lists.
+**Campaign state comes from ESI**: `GET /military-campaigns` (public, 60s cache) returns each
+campaign's `state` (`Unspecified`/`Active`/`Completed`/`Expired`), `progress` (capped at
+`targetProgress`), `started` and `finished`. The sync job (`/home/scripts/militarycampaigns/
+run.py`, `sync_campaigns()`) stores it in `militarycampaigns.milCampaignStatus`, and
+`fetchCampaignStates()`/`applyCampaignState()` in `includes/functions.php` read it: `Completed`
+= VICTORY, `Expired` = UNSUCCESSFUL (labels/text from the `finished*` annotations), no row or
+`Unspecified` = no state shown. `finished` is when the campaign left `Active` - for a victory
+that's when it hit its target, which can be weeks before the season closes and its remaining
+objectives expire (season 1: campaigns finished 09-16..09-26, objectives expired 09-29). So a
+finished campaign can legitimately still have `Active` objectives; don't override objective
+state from campaign state. The SDE has none of this (no state, no dates). ESI campaign IDs must
+be sent dashed; the dashless DB form 404s. (Before this endpoint was found, state was inferred
+from objective rows; that inference is gone. The objective sync can still occasionally miss an
+objective's final Completed update - in season 1 three rows were stuck `Active` until a full
+re-pull from `after=0`.) On the index page, once *every* campaign in a `campaignSet` has
+finished, that set is rendered as a collapsed "Season N" section (Bootstrap
+`data-toggle="collapse"`, client-side so the shared index cache entry needs no cache_id); until
+then all its campaigns stay in the main list. The panel markup lives once in a Smarty
+`{function name=campaignPanel}` used by both lists.
 
 **Smarty caching gotcha**: caching is on (`Smarty::CACHING_LIFETIME_SAVED`, default 1 hour
 lifetime, inherited from Smarty's default — never explicitly set here). Smarty's cache key

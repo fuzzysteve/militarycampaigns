@@ -284,9 +284,7 @@ function enrichActivityWithStatus($dbh, $activity)
         return $activity;
     }
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $states = fetchCampaignStates($dbh);
-    $sql = "SELECT o.objectiveID, o.campaignID, o.maxProgressPerParticipant, o.targetProgress,
-                   st.state, st.progress
+    $sql = "SELECT o.objectiveID, o.maxProgressPerParticipant, st.state
             FROM milCampaignObjectives o
             LEFT JOIN militarycampaigns.milCampaignObjectiveStatus st ON st.objectiveID = o.objectiveID
             WHERE o.objectiveID IN ($placeholders)";
@@ -296,8 +294,7 @@ function enrichActivityWithStatus($dbh, $activity)
     while ($row = $stmt->fetchObject()) {
         if (isset($activity[$row->objectiveID])) {
             $activity[$row->objectiveID]['maxProgressPerParticipant'] = (int)$row->maxProgressPerParticipant;
-            $cs = isset($states[$row->campaignID]) ? $states[$row->campaignID] : null;
-            $activity[$row->objectiveID]['status'] = effectiveObjectiveState($row->state, $row->progress, $row->targetProgress, $cs);
+            $activity[$row->objectiveID]['status'] = $row->state;
         }
     }
 
@@ -358,92 +355,46 @@ function fetchObjectiveAnnotations($dbh, $campaignID)
     return $result;
 }
 
-// Neither the SDE nor ESI gives a campaign-level state or end date, so it's
-// derived from the synced objective rows. A campaign has ended when it has
-// no Active objective left, or nothing in it has changed for
-// CAMPAIGN_STALE_DAYS. The second case is needed because the sync is a
-// cursor-based change feed: once a campaign closes, ESI stops returning it,
-// and a few objectives can be left "Active" in our table forever (season 1
-// left three). The end date is the latest objective `finished` time.
-//
-// Leftover Active rows on an ended campaign were really Completed: when a
-// campaign closes, ESI expires every objective still open in one batch
-// (season 1: all 53 Expired rows finished at 2026-09-29 11:00, and the sync
-// got every one of them), so a row that never got that expiry was already
-// closed - and the only other way to close is completing. The sync just
-// missed its final update (two of season 1's three sat at exactly
-// progress == target; Rogue Edge's courier row stopped updating at 94% in
-// June). This only applies if we did see that close-out batch (the campaign
-// has Expired rows); without it, fall back to "reached its own target".
-// Victory = Completed (incl. those) >= milCampaigns.targetProgress.
-define('CAMPAIGN_STALE_DAYS', 3);
-
+// Campaign-level state comes straight from ESI's GET /military-campaigns,
+// stored in militarycampaigns.milCampaignStatus by the sync job
+// (/home/scripts/militarycampaigns/run.py). ESI states are Unspecified /
+// Active / Completed / Expired: Completed is a victory (the campaign reached
+// its targetProgress), Expired a failure. `finished` is when the campaign
+// left Active - for a victory that's when it hit its target, which can be
+// well before the season itself closes and its remaining objectives expire.
+// ESI's `progress` is capped at targetProgress.
 function fetchCampaignStates($dbh)
 {
-    $sql = "SELECT st.campaignID,
-                   MIN(st.started) AS startedAt,
-                   MAX(st.finished) AS lastFinished,
-                   SUM(st.state = 'Active') AS activeCount,
-                   SUM(st.state = 'Expired') AS expiredCount,
-                   SUM(st.state = 'Active' AND o.targetProgress > 0 AND st.progress >= o.targetProgress) AS activeAtTargetCount,
-                   MAX(st.lastModified) < UTC_TIMESTAMP() - INTERVAL ".CAMPAIGN_STALE_DAYS." DAY AS isStale,
-                   SUM(st.state = 'Completed') AS completedCount
-            FROM militarycampaigns.milCampaignObjectiveStatus st
-            LEFT JOIN milCampaignObjectives o ON o.objectiveID = st.objectiveID
-            GROUP BY st.campaignID";
-    $stmt = $dbh->prepare($sql);
+    $stmt = $dbh->prepare("SELECT campaignID, state, progress, started, finished
+                           FROM militarycampaigns.milCampaignStatus");
     $stmt->execute();
-
     $states = array();
     while ($row = $stmt->fetchObject()) {
-        $ended = ((int)$row->activeCount === 0 || (int)$row->isStale === 1);
-        $closeoutSeen = $ended && (int)$row->expiredCount > 0;
-        $completed = (int)$row->completedCount;
-        if ($ended) {
-            $completed += $closeoutSeen ? (int)$row->activeCount : (int)$row->activeAtTargetCount;
-        }
-        $states[$row->campaignID] = (object)array(
-            'startedAt' => $row->startedAt,
-            'ended' => $ended,
-            'closeoutSeen' => $closeoutSeen,
-            'endedAt' => $row->lastFinished,
-            'completedCount' => $completed,
-        );
+        $states[$row->campaignID] = $row;
     }
     return $states;
 }
 
-// Fills in the derived state for one campaign row (needs ->campaignID and
-// ->targetProgress): ->ended, ->startedAt, ->endedAt, ->completedCount,
-// ->victory (null unless ended), and ->campaignProgressPercent.
+// Fills in the campaign's state from fetchCampaignStates() (needs
+// ->campaignID and ->targetProgress): ->hasStatus, ->state, ->ended,
+// ->victory (null unless ended), ->startedAt, ->endedAt, ->campaignProgress,
+// ->campaignProgressPercent. A campaign with no status row yet (sync not run)
+// or in the Unspecified state shows no state at all.
 function applyCampaignState($campaign, $states)
 {
     $s = isset($states[$campaign->campaignID]) ? $states[$campaign->campaignID] : null;
+    if ($s && $s->state === 'Unspecified') {
+        $s = null;
+    }
     $campaign->hasStatus = ($s !== null);
-    $campaign->ended = $s ? $s->ended : false;
-    $campaign->closeoutSeen = $s ? $s->closeoutSeen : false;
-    $campaign->startedAt = $s ? $s->startedAt : null;
-    $campaign->endedAt = ($s && $s->ended) ? $s->endedAt : null;
-    $campaign->completedCount = $s ? $s->completedCount : 0;
-    $campaign->victory = $campaign->ended ? ($campaign->completedCount >= (int)$campaign->targetProgress) : null;
-    $campaign->campaignProgressPercent = $campaign->targetProgress > 0
-        ? round(min(100, $campaign->completedCount / $campaign->targetProgress * 100), 1)
+    $campaign->state = $s ? $s->state : null;
+    $campaign->ended = $s ? in_array($s->state, array('Completed', 'Expired'), true) : false;
+    $campaign->victory = $campaign->ended ? ($s->state === 'Completed') : null;
+    $campaign->startedAt = $s ? $s->started : null;
+    $campaign->endedAt = $campaign->ended ? $s->finished : null;
+    $campaign->campaignProgress = $s ? (int)$s->progress : 0;
+    $campaign->campaignProgressPercent = ($s && $campaign->targetProgress > 0)
+        ? round(min(100, $campaign->campaignProgress / $campaign->targetProgress * 100), 1)
         : null;
     return $campaign;
-}
-
-// An objective left "Active" after its campaign ended is shown with the
-// same rule fetchCampaignStates() uses for the outcome: Completed if the
-// close-out expiry batch was seen (it wasn't open at close), otherwise
-// Completed only if it had reached its target, else Expired.
-// $campaignState is a fetchCampaignStates() entry or null.
-function effectiveObjectiveState($state, $progress, $targetProgress, $campaignState)
-{
-    if ($state === 'Active' && $campaignState && $campaignState->ended) {
-        if ($campaignState->closeoutSeen) {
-            return 'Completed';
-        }
-        return ($targetProgress > 0 && $progress >= $targetProgress) ? 'Completed' : 'Expired';
-    }
-    return $state;
 }

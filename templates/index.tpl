@@ -35,7 +35,7 @@
                     <dt>Objectives</dt><dd>{$campaign->objectiveCount}</dd>
                     {if $campaign->presentingCharacterName}<dt>Presented By</dt><dd>{$campaign->presentingCharacterName}</dd>{/if}
                     {if $campaign->hasStatus}
-                    <dt>Campaign Progress</dt><dd>{$campaign->completedCount} / {$campaign->targetProgress|number_format} objectives completed</dd>
+                    <dt>Campaign Progress</dt><dd>{$campaign->campaignProgress|number_format} / {$campaign->targetProgress|number_format}</dd>
                     <dt>Started</dt><dd>{$campaign->startedAt}</dd>
                     {if $campaign->ended}<dt>Ended</dt><dd>{$campaign->endedAt}</dd>{/if}
                     {/if}
@@ -57,7 +57,7 @@
 {/foreach}
 {foreach $endedSeasons as $season}
 <h3>
-    {$season.label} <small>ended {$season.endedAt|substr:0:10}, {$season.campaigns|@count} campaign{if $season.campaigns|@count != 1}s{/if}</small>
+    {$season.label} <small>{$season.campaigns|@count} campaign{if $season.campaigns|@count != 1}s{/if}, all finished (last {$season.lastFinished|substr:0:10})</small>
     <button type="button" class="btn btn-default btn-sm" data-toggle="collapse" data-target="#{$season.id}" aria-expanded="false" aria-controls="{$season.id}">Show / hide</button>
 </h3>
 <div class="collapse" id="{$season.id}">

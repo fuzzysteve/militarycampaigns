@@ -45,23 +45,32 @@ usort($campaigns, function ($x, $y) use ($order) {
     return 0;
 });
 
-// Ended campaigns are grouped by campaignSet ("season") and rendered
-// collapsed on the page; running ones are always shown.
+// A season (campaignSet) is rendered collapsed once every campaign in it has
+// finished; until then all of its campaigns stay in the main list, finished
+// ones included (a campaign can hit its target well before its season ends).
+$setOpen = array();
+foreach ($campaigns as $c) {
+    $set = (string)$c->campaignSet;
+    $setOpen[$set] = (isset($setOpen[$set]) && $setOpen[$set]) || !$c->ended;
+}
 $activeCampaigns = array();
 $endedSeasons = array();
 foreach ($campaigns as $c) {
-    if (!$c->ended) {
+    $set = (string)$c->campaignSet;
+    if ($setOpen[$set]) {
         $activeCampaigns[] = $c;
         continue;
     }
-    $set = (string)$c->campaignSet;
     if (!isset($endedSeasons[$set])) {
         $endedSeasons[$set] = array(
             'id' => 'ended-'.preg_replace('/[^A-Za-z0-9_-]/', '', $set),
             'label' => preg_match('/season[_ ]?(\d+)/i', $set, $m) ? 'Season '.$m[1] : ($set !== '' ? humanizeCode($set) : 'Other'),
-            'endedAt' => $c->endedAt,
+            'lastFinished' => $c->endedAt,
             'campaigns' => array(),
         );
+    }
+    if (strcmp((string)$c->endedAt, (string)$endedSeasons[$set]['lastFinished']) > 0) {
+        $endedSeasons[$set]['lastFinished'] = $c->endedAt;
     }
     $endedSeasons[$set]['campaigns'][] = $c;
 }

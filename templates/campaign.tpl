@@ -88,7 +88,7 @@ $(document).ready(function() {
     <dt>Target Progress</dt><dd>{$campaign->targetProgress|number_format}</dd>
     {if $campaign->hasStatus}
     <dt>Campaign Progress</dt><dd>
-        {$campaign->completedCount} / {$campaign->targetProgress|number_format} objectives completed
+        {$campaign->campaignProgress|number_format} / {$campaign->targetProgress|number_format}
         {if $campaign->campaignProgressPercent !== null}
         <div class="progress" style="margin:4px 0 0 0;height:16px;max-width:400px;">
             <div class="progress-bar {if $campaign->ended}{if $campaign->victory}progress-bar-success{else}progress-bar-danger{/if}{else}progress-bar-info{/if}" style="width:{$campaign->campaignProgressPercent}%">{$campaign->campaignProgressPercent}%</div>
@@ -106,7 +106,7 @@ $(document).ready(function() {
     <div class="panel-heading">
         <h3 class="panel-title">{$annotations.finishedCampaignEnded|default:'Campaign Ended'}:
             <strong>{if $campaign->victory}{$annotations.finishedResolutionStateSuccess|default:'Victory'}{else}{$annotations.finishedResolutionStateFailure|default:'Unsuccessful'}{/if}</strong>
-            <small>{$campaign->completedCount} of {$campaign->targetProgress|number_format} objectives needed were completed</small>
+            <small>{if $campaign->victory}target reached {$campaign->endedAt}{else}ended {$campaign->endedAt} at {$campaign->campaignProgress|number_format} / {$campaign->targetProgress|number_format}{/if}</small>
         </h3>
     </div>
     {if $campaign->victory && $annotations.finishedSuccessDescription|default:''}
@@ -234,7 +234,7 @@ $(document).ready(function() {
             <td>{$objective->methodDisplay}</td>
             <td class="text-center">
                 {if $objective->statusState}
-                <span class="label label-{if $objective->statusState=='Completed'}success{elseif $objective->statusState=='Expired'}warning{else}info{/if}"{if $objective->statusRawState != $objective->statusState} title="ESI last reported this objective as {$objective->statusRawState} ({$objective->statusProgress|number_format} / {$objective->targetProgress|number_format}){if $campaign->closeoutSeen}; it was not expired when the campaign closed, so it completed and the sync missed the final update{/if}"{/if}>{$objective->statusState}</span>
+                <span class="label label-{if $objective->statusState=='Completed'}success{elseif $objective->statusState=='Expired'}warning{else}info{/if}">{$objective->statusState}</span>
                 {if $objective->progressPercent !== null}
                 <div class="progress" style="margin:12px 0 0 0;height:16px;">
                     <div class="progress-bar {if $objective->statusState=='Completed'}progress-bar-success{elseif $objective->statusState=='Expired'}progress-bar-warning{else}progress-bar-info{/if}" style="width:{$objective->progressPercent}%">{$objective->progressPercent}%</div>

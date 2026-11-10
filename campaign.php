@@ -19,9 +19,7 @@ if (!$campaign) {
     exit;
 }
 $campaign->subtitle = eveRichText($campaign->subtitle);
-$campaignStates = fetchCampaignStates($dbh);
-applyCampaignState($campaign, $campaignStates);
-$campaignState = isset($campaignStates[$campaignID]) ? $campaignStates[$campaignID] : null;
+applyCampaignState($campaign, fetchCampaignStates($dbh));
 
 // Briefing / map / outcome text, already passed through eveRichText().
 $campaignAnnotations = fetchCampaignAnnotations($dbh, array($campaignID));
@@ -77,9 +75,6 @@ while ($row = $objstmt->fetchObject()) {
     $row->tags = $tags;
     $row->tagsAttr = implode('|', $tags);
     $row->methodDisplay = camelCaseToWords($row->contributionMethod);
-
-    $row->statusRawState = $row->statusState;
-    $row->statusState = effectiveObjectiveState($row->statusState, $row->statusProgress, $row->targetProgress, $campaignState);
 
     // warning1, warning2, ... in key order. (restrictionTooltip is a
     // plain-text duplicate of warning1, and requiredEnlistmentWithFactionID
