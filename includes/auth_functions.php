@@ -50,7 +50,6 @@ function mc_exchange_code($code)
     $result = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $error = curl_error($ch);
-    curl_close($ch);
 
     if ($result === false) {
         error_log('mc_exchange_code: curl error: '.$error);
@@ -92,7 +91,6 @@ function mc_fetch_activity($accessToken, $characterId)
         $body = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
-        curl_close($ch);
 
         if ($body === false || $httpCode !== 200) {
             error_log('mc_fetch_activity: HTTP '.$httpCode.' error '.$error.': '.$body);
