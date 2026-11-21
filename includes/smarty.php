@@ -2,7 +2,7 @@
 
 require_once $basedir."/vendor/autoload.php";
 
-$smarty = new Smarty();
+$smarty = new \Smarty\Smarty();
 
 $smarty->registerPlugin('function', 'include_php', function($params, $smarty) {
     ob_start();
@@ -16,5 +16,5 @@ $smarty->setCacheDir($basedir.'/cache');
 $smarty->setConfigDir($basedir.'/configs');
 #$smarty->security=false;
 
-$smarty->setCaching(Smarty::CACHING_LIFETIME_SAVED);
+$smarty->setCaching(\Smarty\Smarty::CACHING_LIFETIME_SAVED);
 $smarty->assign('baseurl', $baseurl);

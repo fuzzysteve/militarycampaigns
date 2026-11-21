@@ -4,39 +4,43 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c04a079511417d735dee18287b041eaf",
+    "content-hash": "ac635383b60254630e360fd6db297957",
     "packages": [
         {
             "name": "smarty/smarty",
-            "version": "v4.6.0",
+            "version": "v5.9.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/smarty-php/smarty.git",
-                "reference": "619e59aa1fecfa8c184dc6143568502051af9fc3"
+                "reference": "d37716def381e7b0450ed1608f24045c18f67eba"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/619e59aa1fecfa8c184dc6143568502051af9fc3",
-                "reference": "619e59aa1fecfa8c184dc6143568502051af9fc3",
+                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/d37716def381e7b0450ed1608f24045c18f67eba",
+                "reference": "d37716def381e7b0450ed1608f24045c18f67eba",
                 "shasum": ""
             },
             "require": {
-                "php": "^7.1 || ^8.0"
+                "php": "^7.2 || ^8.0",
+                "symfony/polyfill-mbstring": "^1.27"
             },
             "require-dev": {
                 "phpunit/phpunit": "^8.5 || ^7.5",
-                "smarty/smarty-lexer": "^3.1"
+                "smarty/smarty-lexer": "^4.0.2"
             },
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "4.0.x-dev"
+                    "dev-master": "5.0.x-dev"
                 }
             },
             "autoload": {
-                "classmap": [
-                    "libs/"
-                ]
+                "files": [
+                    "src/functions.php"
+                ],
+                "psr-4": {
+                    "Smarty\\": "src/"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -68,7 +72,7 @@
             "support": {
                 "forum": "https://github.com/smarty-php/smarty/discussions",
                 "issues": "https://github.com/smarty-php/smarty/issues",
-                "source": "https://github.com/smarty-php/smarty/tree/v4.6.0"
+                "source": "https://github.com/smarty-php/smarty/tree/v5.9.0"
             },
             "funding": [
                 {
@@ -76,7 +80,92 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-16T10:12:35+00:00"
+            "time": "2026-11-16T10:13:43+00:00"
+        },
+        {
+            "name": "symfony/polyfill-mbstring",
+            "version": "v1.43.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/polyfill-mbstring.git",
+                "reference": "122889ed24dc000165bcbfd77ec412f15cbdfc6a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/122889ed24dc000165bcbfd77ec412f15cbdfc6a",
+                "reference": "122889ed24dc000165bcbfd77ec412f15cbdfc6a",
+                "shasum": ""
+            },
+            "require": {
+                "ext-iconv": "*",
+                "php": ">=7.2"
+            },
+            "provide": {
+                "ext-mbstring": "*"
+            },
+            "suggest": {
+                "ext-mbstring": "For best performance"
+            },
+            "type": "library",
+            "extra": {
+                "thanks": {
+                    "url": "https://github.com/symfony/polyfill",
+                    "name": "symfony/polyfill"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "bootstrap.php"
+                ],
+                "psr-4": {
+                    "Symfony\\Polyfill\\Mbstring\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Nicolas Grekas",
+                    "email": "p@tchwork.com"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Symfony polyfill for the Mbstring extension",
+            "homepage": "https://symfony.com",
+            "keywords": [
+                "compatibility",
+                "mbstring",
+                "polyfill",
+                "portable",
+                "shim"
+            ],
+            "support": {
+                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.43.3"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/nicolas-grekas",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2026-10-28T09:35:49+00:00"
         }
     ],
     "packages-dev": [],

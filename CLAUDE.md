@@ -246,7 +246,7 @@ finished, that set is rendered as a collapsed "Season N" section (Bootstrap
 then all its campaigns stay in the main list. The panel markup lives once in a Smarty
 `{function name=campaignPanel}` used by both lists.
 
-**Smarty caching gotcha**: caching is on (`Smarty::CACHING_LIFETIME_SAVED`, default 1 hour
+**Smarty caching gotcha**: caching is on (`\Smarty\Smarty::CACHING_LIFETIME_SAVED`, default 1 hour
 lifetime, inherited from Smarty's default — never explicitly set here). Smarty's cache key
 defaults to just the template name, so *every* `display('campaign.tpl')` call would otherwise
 share one cache entry regardless of which campaign was requested. `campaign.php` passes the
